@@ -11,6 +11,9 @@ module.exports = {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
+      fontFamily: {
+        suse: ['SUSE'], // Adding SUSE to Tailwind's fontFamily
+      },
     },
   },
   plugins: [],
