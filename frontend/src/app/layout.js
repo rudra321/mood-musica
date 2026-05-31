@@ -13,21 +13,27 @@ const geistMono = localFont({
 });
 
 export const metadata = {
-  title: "MoodMusica",
-  description: "This is a AI based mood music provider.",
+  title: "MoodMusica — the sound of a place, in a mood",
+  description: "Explore a map. Tap anywhere. Hear that place in your mood.",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <header className="p-4 bg-blue-500 text-white">
-          <h1>MoodMusica</h1>
-        </header>
-        <main className="p-4">{children}</main>
-        <footer className="p-4 bg-blue-500 text-white text-center">&copy; 2024 MoodMusica</footer>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..600&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {children}
       </body>
     </html>
   );

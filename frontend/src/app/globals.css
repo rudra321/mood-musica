@@ -2,8 +2,223 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=SUSE:wght@100,200,300,400,500,600,700,800&display=swap');
+:root {
+  --bg: #f1efe9; /* warm paper */
+  --fg: #1c1b19;
+}
+
+html,
+body {
+  height: 100%;
+}
 
 body {
-    font-family: 'SUSE', sans-serif;
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* --- Living color aurora ---------------------------------------------------
+   Perf notes: NO mix-blend-mode (that forces re-raster on scroll). The whole
+   layer is GPU-isolated (translateZ + isolation) so it never repaints while the
+   page scrolls — it only animates its own transforms. Moderate blur. */
+.aurora {
+  position: fixed;
+  inset: -18vmax;
+  z-index: -2;
+  filter: blur(64px) saturate(135%);
+  opacity: 0.46;
+  transition: opacity 1.5s ease;
+  pointer-events: none;
+  transform: translateZ(0);
+  isolation: isolate;
+}
+.aurora--active {
+  opacity: 0.58;
+}
+.aurora__blob {
+  position: absolute;
+  width: 44vmax;
+  height: 44vmax;
+  border-radius: 50%;
+  opacity: 0.6;
+  will-change: transform;
+  transform: translateZ(0);
+  transition: background-color 1.4s ease;
+}
+.aurora__blob:nth-child(1) {
+  top: -6%;
+  left: -6%;
+  animation: drift1 30s ease-in-out infinite;
+}
+.aurora__blob:nth-child(2) {
+  top: 6%;
+  right: -10%;
+  animation: drift2 36s ease-in-out infinite;
+}
+.aurora__blob:nth-child(3) {
+  bottom: -10%;
+  left: 10%;
+  animation: drift3 32s ease-in-out infinite;
+}
+.aurora__blob:nth-child(4) {
+  bottom: -4%;
+  right: 0%;
+  animation: drift1 40s ease-in-out infinite reverse;
+}
+
+@keyframes drift1 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(7vmax, 5vmax, 0) scale(1.12); }
+}
+@keyframes drift2 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.08); }
+  50% { transform: translate3d(-6vmax, 4vmax, 0) scale(0.96); }
+}
+@keyframes drift3 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(5vmax, -6vmax, 0) scale(1.15); }
+}
+
+/* --- Film grain (static layer, no blend mode → composited once) --- */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Frosted glass — translucent enough that the blurred map shows through, with a
+   strong blur + saturation boost and a bright top edge (the classic glass cue). */
+.glass {
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(28px) saturate(185%);
+  -webkit-backdrop-filter: blur(28px) saturate(185%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+::selection {
+  background: rgba(0, 0, 0, 0.12);
+}
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+}
+
+/* --- Now-playing equalizer --- */
+.eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+.eq i {
+  width: 2px;
+  height: 30%;
+  background: currentColor;
+  border-radius: 1px;
+  animation: eq 0.9s ease-in-out infinite;
+}
+.eq i:nth-child(2) {
+  animation-delay: 0.25s;
+}
+.eq i:nth-child(3) {
+  animation-delay: 0.5s;
+}
+@keyframes eq {
+  0%, 100% { height: 25%; }
+  50% { height: 100%; }
+}
+
+/* --- Map pins --- */
+.pin {
+  position: relative;
+  display: block;
+}
+.pin__dot {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--c, #fff);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 3px rgba(0, 0, 0, 0.25), 0 0 14px var(--c, #fff);
+}
+
+/* Mood-map: each explored place blooms in its own palette color. */
+.bloom {
+  position: absolute;
+  left: -18px;
+  top: -18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, var(--c, #fff) 0%, transparent 68%);
+  opacity: 0.75;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.bloom:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+.bloom::after {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 15px;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--c, #fff);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9);
+}
+.pin__ring {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  border: 2px solid var(--c, #fff);
+  animation: pin-ping 1.8s ease-out infinite;
+}
+@keyframes pin-ping {
+  0% { transform: scale(1); opacity: 0.7; }
+  80%, 100% { transform: scale(3.4); opacity: 0; }
+}
+.dot-mini {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--c, #fff);
+  box-shadow: 0 0 8px var(--c, #fff);
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora__blob,
+  .pin__ring {
+    animation: none !important;
+  }
 }

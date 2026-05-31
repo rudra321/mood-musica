@@ -8,11 +8,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        background: "var(--bg)",
+        foreground: "var(--fg)",
       },
       fontFamily: {
-        suse: ['SUSE'], // Adding SUSE to Tailwind's fontFamily
+        sans: ["var(--font-geist-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
+        display: ["Fraunces", "ui-serif", "Georgia", "serif"],
       },
     },
   },
