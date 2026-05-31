@@ -5,6 +5,7 @@
 // accent tint, and a thin accent progress line.
 
 import { trackId } from "./player-utils";
+import { Play, Pause, ExternalLink } from "./icons";
 
 const fmtDur = (ms) => {
   if (!ms) return null;
@@ -52,11 +53,13 @@ export default function TrackRow({ track, index, player, palette, accent, onOpen
             type="button"
             onClick={() => player.play(track)}
             aria-label={isPlaying ? "Pause preview" : "Play preview"}
-            className={`absolute inset-0 flex items-center justify-center rounded-md bg-black/45 text-white transition-opacity ${
+            className={`absolute inset-0 flex items-center justify-center rounded-md bg-black/30 transition-opacity ${
               isCurrent ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             }`}
           >
-            <span className="text-sm">{isPlaying ? "❚❚" : "▶"}</span>
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-black shadow-sm">
+              {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 translate-x-[1px]" />}
+            </span>
           </button>
         )}
       </div>
@@ -102,7 +105,7 @@ export default function TrackRow({ track, index, player, palette, accent, onOpen
         aria-label="Search on Spotify"
         className="flex-shrink-0 text-black/30 opacity-0 transition group-hover:opacity-100 hover:text-emerald-600"
       >
-        ↗
+        <ExternalLink className="h-4 w-4" />
       </a>
 
       {isCurrent && (

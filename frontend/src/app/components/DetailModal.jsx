@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { trackId } from "./player-utils";
+import { Play, Pause, ExternalLink, Close, ChevronLeft } from "./icons";
 
 const fmtDur = (ms) => {
   if (!ms) return null;
@@ -30,11 +31,13 @@ function PlayArt({ track, player, size = "h-12 w-12" }) {
           type="button"
           onClick={() => player.play(track)}
           aria-label={isPlaying ? "Pause" : "Play"}
-          className={`absolute inset-0 flex items-center justify-center rounded-md bg-black/45 text-white transition-opacity ${
+          className={`absolute inset-0 flex items-center justify-center rounded-md bg-black/30 transition-opacity ${
             isCurrent ? "opacity-100" : "opacity-0 hover:opacity-100"
           }`}
         >
-          <span className="text-sm">{isPlaying ? "❚❚" : "▶"}</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-black shadow-sm">
+            {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 translate-x-[1px]" />}
+          </span>
         </button>
       )}
     </div>
@@ -87,12 +90,12 @@ function TrackView({ track, player, push }) {
 
       <div className="mt-5 flex gap-4 font-mono text-[11px] uppercase tracking-wide">
         {track.links?.apple && (
-          <a href={track.links.apple} target="_blank" rel="noopener noreferrer" className="text-black/55 hover:text-black">
-            Apple Music ↗
+          <a href={track.links.apple} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-black/55 hover:text-black">
+            Apple Music <ExternalLink className="h-3 w-3" />
           </a>
         )}
-        <a href={track.links.spotifySearch} target="_blank" rel="noopener noreferrer" className="text-black/55 hover:text-emerald-600">
-          Spotify ↗
+        <a href={track.links.spotifySearch} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-black/55 hover:text-emerald-600">
+          Spotify <ExternalLink className="h-3 w-3" />
         </a>
       </div>
     </div>
@@ -133,7 +136,7 @@ function ArtistView({ id, player, push }) {
       <h3 className="font-display text-2xl text-[#1c1b19]">{data.name}</h3>
       {data.appleUrl && (
         <a href={data.appleUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block font-mono text-[11px] uppercase tracking-wide text-black/45 hover:text-black">
-          Apple Music ↗
+          Apple Music <ExternalLink className="ml-1 inline h-3 w-3 align-[-1px]" />
         </a>
       )}
 
@@ -239,14 +242,14 @@ export default function DetailModal({ open, player, onClose }) {
           >
             <div className="mb-4 flex items-center justify-between">
               {stack.length > 1 ? (
-                <button type="button" onClick={back} className="font-mono text-xs uppercase tracking-[0.2em] text-black/50 hover:text-black">
-                  ← back
+                <button type="button" onClick={back} className="inline-flex items-center gap-1 font-mono text-xs uppercase tracking-[0.2em] text-black/50 hover:text-black">
+                  <ChevronLeft className="h-3.5 w-3.5" /> back
                 </button>
               ) : (
                 <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-black/40">{title}</span>
               )}
               <button type="button" onClick={onClose} aria-label="Close" className="text-black/50 hover:text-black">
-                ✕
+                <Close className="h-4 w-4" />
               </button>
             </div>
 

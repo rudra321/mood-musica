@@ -4,6 +4,7 @@
 // persists across re-searches.
 
 import { AnimatePresence, motion } from "framer-motion";
+import { Play, Pause } from "./icons";
 
 export default function NowPlaying({ player }) {
   const t = player.currentTrack;
@@ -24,9 +25,9 @@ export default function NowPlaying({ player }) {
               type="button"
               onClick={() => player.play(t)}
               aria-label={player.playing ? "Pause" : "Play"}
-              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white"
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-transform hover:scale-105"
             >
-              <span className="text-sm">{player.playing ? "❚❚" : "▶"}</span>
+              {player.playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 translate-x-[1px]" />}
             </button>
 
             {t.artworkUrl ? (

@@ -13,6 +13,7 @@ import Tuner, { ERA_MIN, ERA_MAX } from "./Tuner";
 import DetailModal from "./DetailModal";
 import VibesRail from "./VibesRail";
 import { trackId } from "./player-utils";
+import { Sparkles, Locate, Sliders, ArrowRight } from "./icons";
 
 const MapCanvas = dynamic(() => import("./MapCanvas"), {
   ssr: false,
@@ -184,8 +185,8 @@ export default function MapExplorer() {
   const accent = vibe?.palette?.colors?.[0];
   const panelOpen = status === "loading" || status === "done" || status === "error";
 
-  const ghostBtn =
-    "rounded-xl border border-black/10 px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-black/55 transition-colors hover:text-black hover:border-black/25";
+  const iconBtn =
+    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-black/10 text-black/55 transition-colors hover:border-black/30 hover:text-black";
 
   return (
     <div className="fixed inset-0 overflow-hidden text-[#1c1b19]">
@@ -217,25 +218,27 @@ export default function MapExplorer() {
             aria-label="Describe your mood"
             className="flex-1 bg-transparent px-3 py-2 text-[#1c1b19] placeholder:text-black/35 focus:outline-none"
           />
-          <button type="button" onClick={surprise} aria-label="Surprise me" className={ghostBtn}>
-            🎲
+          <button type="button" onClick={surprise} aria-label="Surprise me" className={iconBtn}>
+            <Sparkles className="h-5 w-5" />
           </button>
-          <button type="button" onClick={locateMe} aria-label="Use my location" className={ghostBtn}>
-            ⌖ me
+          <button type="button" onClick={locateMe} aria-label="Use my location" className={iconBtn}>
+            <Locate className="h-5 w-5" />
           </button>
           <button
             type="button"
             onClick={() => setTunerOpen((v) => !v)}
             aria-label="Tune era and adventurousness"
             aria-pressed={tunerOpen}
-            className={`rounded-xl border px-3 py-2 text-sm transition-colors ${
-              tunerOpen ? "border-black/40 text-black" : "border-black/10 text-black/55 hover:text-black"
-            }`}
+            className={`${iconBtn} ${tunerOpen ? "border-black/40 text-black" : ""}`}
           >
-            ⚙
+            <Sliders className="h-5 w-5" />
           </button>
-          <button type="submit" className="rounded-xl bg-neutral-900 px-4 py-2 font-medium text-white">
-            →
+          <button
+            type="submit"
+            aria-label="Reveal"
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white transition-transform hover:scale-105"
+          >
+            <ArrowRight className="h-5 w-5" />
           </button>
         </form>
 
