@@ -83,10 +83,40 @@ export function ExternalLink({ className = "h-4 w-4" }) {
   );
 }
 
+export function Image({ className = "h-4 w-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" {...stroke}>
+      <rect x="3" y="4" width="18" height="16" rx="3.5" />
+      <circle cx="8.5" cy="9.5" r="1.6" />
+      <path d="M4 17.5l4.5-4.2a2 2 0 0 1 2.8 0L20 21" />
+    </svg>
+  );
+}
+
+export function Route({ className = "h-4 w-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" {...stroke}>
+      <circle cx="6" cy="18" r="2.4" />
+      <circle cx="18" cy="6" r="2.4" />
+      <path d="M8.4 18H14a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h2" />
+    </svg>
+  );
+}
+
 export function Close({ className = "h-4 w-4" }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true" {...stroke}>
       <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+export function Share({ className = "h-4 w-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" {...stroke}>
+      <path d="M12 3v13" />
+      <path d="M8 7l4-4 4 4" />
+      <path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
     </svg>
   );
 }

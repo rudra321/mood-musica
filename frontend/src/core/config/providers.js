@@ -5,9 +5,11 @@
 
 import { createOpenAICompatibleInterpreter } from "../adapters/interpreters/openai-compatible.js";
 import { createRuleBasedInterpreter } from "../adapters/interpreters/rule-based.js";
+import { createFallbackInterpreter } from "../adapters/interpreters/fallback.js";
 import { createItunesResolver } from "../adapters/resolvers/itunes.js";
 import { createNominatimGeocoder } from "../adapters/geocoders/nominatim.js";
 import { createAppleRssChartProvider } from "../adapters/charts/apple-rss.js";
+import { createOpenMeteoWeather } from "../adapters/weather/open-meteo.js";
 import { createItunesCatalog } from "../adapters/catalog/itunes.js";
 import { createVibe } from "../services/create-vibe.js";
 import { ConfigError } from "../domain/errors.js";
@@ -35,9 +37,6 @@ const interpreters = {
   "rule-based": () => createRuleBasedInterpreter(),
 };
 
-/** Which env var holds the API key for each interpreter (for a clear error). */
-const interpreterKeyEnv = { groq: "GROQ_API_KEY", gemini: "GEMINI_API_KEY" };
-
 /** @type {Record<string, () => import("../ports/track-resolver.js").TrackResolver>} */
 const resolvers = {
   itunes: () => createItunesResolver(),
@@ -51,6 +50,11 @@ const geocoders = {
 /** @type {Record<string, () => import("../ports/chart-provider.js").ChartProvider>} */
 const chartProviders = {
   "apple-rss": () => createAppleRssChartProvider(),
+};
+
+/** @type {Record<string, () => import("../ports/weather-provider.js").WeatherProvider>} */
+const weatherProviders = {
+  "open-meteo": () => createOpenMeteoWeather(),
 };
 
 /** @type {Record<string, () => import("../ports/music-catalog.js").MusicCatalog>} */
@@ -70,21 +74,35 @@ function pick(registry, key, label) {
  * @returns {(input: { mood: string, lat?: number, lng?: number }) => Promise<import("../domain/vibe.js").TResolvedVibe>}
  */
 export function getVibeService() {
-  const interpreterKey = process.env.MOOD_INTERPRETER || "groq";
+  const interpreterKey = process.env.MOOD_INTERPRETER || "gemini";
 
-  const needEnv = interpreterKeyEnv[interpreterKey];
-  if (needEnv && !process.env[needEnv]) {
-    throw new ConfigError(`${needEnv} is not set. Add it to frontend/.env.local.`);
+  // Build a fallback chain: the selected brain first, then any other configured
+  // API brain, then the zero-key rule-based brain last (never fails). So a
+  // rate-limited/quota-capped provider degrades to the next instead of erroring.
+  const order = [...new Set([interpreterKey, "gemini", "groq", "rule-based"])];
+  const chain = [];
+  for (const key of order) {
+    if (!interpreters[key]) continue;
+    if (key === "gemini" && !process.env.GEMINI_API_KEY) continue;
+    if (key === "groq" && !process.env.GROQ_API_KEY) continue;
+    chain.push(interpreters[key]());
   }
+  if (chain.length === 0) chain.push(interpreters["rule-based"]());
+  const interpreter = chain.length === 1 ? chain[0] : createFallbackInterpreter({ chain });
 
   return createVibe({
-    interpreter: pick(interpreters, interpreterKey, "MOOD_INTERPRETER"),
+    interpreter,
     resolver: pick(resolvers, process.env.TRACK_RESOLVER || "itunes", "TRACK_RESOLVER"),
     geocoder: pick(geocoders, process.env.GEOCODER || "nominatim", "GEOCODER"),
     chartProvider: pick(
       chartProviders,
       process.env.CHART_PROVIDER || "apple-rss",
       "CHART_PROVIDER"
+    ),
+    weatherProvider: pick(
+      weatherProviders,
+      process.env.WEATHER_PROVIDER || "open-meteo",
+      "WEATHER_PROVIDER"
     ),
   });
 }

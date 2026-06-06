@@ -4,21 +4,55 @@
 // carries region identity + vibe meters; the tracklist sits below on a light
 // surface. Light mode.
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { trackId } from "./player-utils";
 import { flagOf, cityOf, energyLevel } from "./format";
+import { Share } from "./icons";
 import TrackRow from "./TrackRow";
 
 const GRAIN =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
+const fmtHour = (h) => (h == null ? null : `${((h + 11) % 12) + 1}${h < 12 ? "am" : "pm"}`);
+
 export default function VibeCard({ vibe, player, onOpenDetail }) {
-  const { palette, mood, tracks, textColor, interpretation, place } = vibe;
+  const { palette, mood, tracks, textColor, interpretation, place, weather } = vibe;
   const band = `linear-gradient(135deg, ${palette.gradientFrom}, ${palette.gradientTo})`;
   const accent = palette.colors[2] || palette.colors[0] || palette.gradientFrom;
 
   const city = place ? cityOf(place.label) : null;
   const flag = place ? flagOf(place.countryCode) : "";
+
+  const [shared, setShared] = useState(false);
+  function shareCardUrl() {
+    const d = {
+      n: palette.name,
+      gf: palette.gradientFrom,
+      gt: palette.gradientTo,
+      tc: textColor,
+      co: palette.colors,
+      pl: city,
+      fl: flag,
+      ms: mood.subtitle || "",
+      tr: tracks.slice(0, 6).map((t) => [t.title, t.artist]),
+    };
+    return `${window.location.origin}/api/og?d=${encodeURIComponent(JSON.stringify(d))}`;
+  }
+  async function onShare() {
+    const url = shareCardUrl();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: palette.name, text: "the sound of a feeling", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShared(true);
+        setTimeout(() => setShared(false), 1600);
+      }
+    } catch {
+      /* user dismissed share sheet */
+    }
+  }
   const lvl = energyLevel(interpretation?.energy);
   const era = interpretation?.era;
   const topGenre = (interpretation?.genres || [])[0];
@@ -36,10 +70,27 @@ export default function VibeCard({ vibe, player, onOpenDetail }) {
         <div className="pointer-events-none absolute inset-0 opacity-[0.09]" style={{ backgroundImage: GRAIN }} />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/35" />
 
+        <button
+          type="button"
+          onClick={onShare}
+          aria-label="Share this vibe"
+          className="absolute right-4 top-4 z-10 flex items-center gap-1.5 rounded-full px-2.5 py-1.5 font-mono text-[11px] uppercase tracking-wide transition-opacity hover:opacity-100"
+          style={{ background: "rgba(255,255,255,0.18)", color: textColor, opacity: 0.85 }}
+        >
+          <Share className="h-3.5 w-3.5" /> {shared ? "copied" : "share"}
+        </button>
+
         <div className="relative">
           <p className="font-display text-sm italic" style={{ opacity: 0.85 }}>
             {city ? `${flag} the sound of ${city}` : mood.label || "your vibe"}
           </p>
+          {weather && (weather.emoji || weather.tempC != null) && (
+            <p className="mt-1 font-mono text-[11px]" style={{ opacity: 0.72 }}>
+              {[weather.emoji, weather.description, weather.tempC != null && `${weather.tempC}°`, fmtHour(weather.localHour)]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
           <h2 className="mt-1.5 font-display text-[30px] font-medium leading-[1.04] tracking-[-0.01em]">
             {palette.name}
           </h2>

@@ -24,6 +24,7 @@ export function buildSystemPrompt() {
     bullet(rules.SONG_REALITY),
     bullet(rules.MOOD_PRIMACY),
     bullet(rules.ANTI_CANON),
+    bullet(rules.IMAGE_RULE),
     bullet(rules.PLACE_RULE),
     bullet(rules.LOCAL_LANGUAGE),
     bullet(rules.CHART_HINT_RULE),
@@ -34,9 +35,11 @@ export function buildSystemPrompt() {
   ].join("\n");
 }
 
-/** Stage 2: per-request context — mood, brief, place, chart, era, familiarity, exclude, seed. */
-export function buildUserMessage({ mood, brief, place, chart, era, familiarity, exclude, seed }) {
-  const parts = [`Mood: ${mood}`];
+/** Stage 2: per-request context — mood, brief, place, weather, chart, era, familiarity, exclude, seed. */
+export function buildUserMessage({ mood, image, brief, place, weather, chart, era, familiarity, exclude, seed }) {
+  const parts = [
+    mood ? `Mood: ${mood}` : "Mood: derive it from the shared photo — its colors and feeling.",
+  ];
 
   if (brief) {
     parts.push(`Parsed brief (use it to target the picks precisely):\n${JSON.stringify(brief)}`);
@@ -45,6 +48,14 @@ export function buildUserMessage({ mood, brief, place, chart, era, familiarity, 
     parts.push(
       `Place: ${place.label} (country ${place.countryCode.toUpperCase()}). Favor music rooted in this place/region.`
     );
+  }
+  if (weather && (weather.localHour != null || weather.description)) {
+    const bits = [
+      weather.partOfDay && `it's ${weather.partOfDay}`,
+      weather.description,
+      weather.tempC != null && `${weather.tempC}°C`,
+    ].filter(Boolean).join(", ");
+    parts.push(`Right now there: ${bits}. Let this subtly color the selection (e.g. a rainy night vs a bright morning), without overriding the mood.`);
   }
 
   const eraLine = rules.eraRule(era);

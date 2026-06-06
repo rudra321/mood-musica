@@ -23,7 +23,7 @@ export default function VibesRail({ explored, onSelect }) {
           </p>
           <ul className="space-y-1">
             {[...explored].reverse().map((e, i) => (
-              <li key={`${e.coords.lat},${e.coords.lng},${i}`}>
+              <li key={`${e.coords ? `${e.coords.lat},${e.coords.lng}` : "photo"},${i}`}>
                 <button
                   type="button"
                   onClick={() => onSelect(e)}

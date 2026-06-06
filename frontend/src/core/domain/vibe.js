@@ -82,32 +82,44 @@ export const Place = z.object({
   lng: z.number(),
 });
 
+/** Local conditions at the place (weather + local hour) for "right here, right now". */
+export const Weather = z.object({
+  tempC: z.number().nullable().default(null),
+  description: z.string().default(""),
+  emoji: z.string().default(""),
+  localHour: z.number().int().min(0).max(23).nullable().default(null),
+  partOfDay: z.string().default(""),
+});
+
 /** The complete payload returned to the client. */
 export const ResolvedVibe = Vibe.extend({
   tracks: z.array(ResolvedTrack),
   textColor: HexColor,
   place: Place.nullable().default(null),
+  weather: Weather.nullable().default(null),
 });
 
-/** The HTTP request body for POST /api/vibe. Location + tuning are optional. */
-export const VibeRequest = z.object({
-  mood: z
-    .string()
-    .trim()
-    .min(1, "Tell me your mood.")
-    .max(280, "Keep it under 280 characters."),
-  lat: z.number().min(-90).max(90).optional(),
-  lng: z.number().min(-180).max(180).optional(),
-  eraFrom: z.number().int().min(1900).max(2100).optional(),
-  eraTo: z.number().int().min(1900).max(2100).optional(),
-  familiarity: z.enum(["deep", "balanced", "hits"]).optional(),
-  exclude: z.array(z.string()).max(60).optional(),
-  seed: z.number().optional(),
-});
+/** The HTTP request body for POST /api/vibe. Mood or a photo required; rest optional. */
+export const VibeRequest = z
+  .object({
+    mood: z.string().trim().max(280, "Keep it under 280 characters.").optional().default(""),
+    image: z.string().optional(), // data URL of an uploaded photo (vision input)
+    lat: z.number().min(-90).max(90).optional(),
+    lng: z.number().min(-180).max(180).optional(),
+    eraFrom: z.number().int().min(1900).max(2100).optional(),
+    eraTo: z.number().int().min(1900).max(2100).optional(),
+    familiarity: z.enum(["deep", "balanced", "hits"]).optional(),
+    exclude: z.array(z.string()).max(60).optional(),
+    seed: z.number().optional(),
+  })
+  .refine((d) => (d.mood && d.mood.length > 0) || d.image, {
+    message: "Tell me your mood or share a photo.",
+  });
 
 /** @typedef {z.infer<typeof TrackIntent>} TTrackIntent */
 /** @typedef {z.infer<typeof Vibe>} TVibe */
 /** @typedef {z.infer<typeof ResolvedTrack>} TResolvedTrack */
 /** @typedef {z.infer<typeof ResolvedVibe>} TResolvedVibe */
 /** @typedef {z.infer<typeof Place>} TPlace */
-/** @typedef {{ mood: string, place: TPlace | null, chart: {artist: string, title: string}[] }} InterpretContext */
+/** @typedef {z.infer<typeof Weather>} TWeather */
+/** @typedef {{ mood: string, place: TPlace | null, chart: {artist: string, title: string}[], weather?: TWeather | null, image?: string | null }} InterpretContext */

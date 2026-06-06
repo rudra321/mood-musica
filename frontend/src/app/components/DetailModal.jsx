@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { trackId } from "./player-utils";
 import { Play, Pause, ExternalLink, Close, ChevronLeft } from "./icons";
+import Spinner from "./Spinner";
 
 const fmtDur = (ms) => {
   if (!ms) return null;
@@ -122,7 +123,7 @@ function useCatalog(type, id) {
 function Loading() {
   return (
     <div className="flex h-40 items-center justify-center">
-      <span className="h-7 w-7 animate-spin rounded-full border-2 border-black/15 border-t-black/70" />
+      <Spinner className="h-7 w-7 border-black/15 border-t-black/70" />
     </div>
   );
 }

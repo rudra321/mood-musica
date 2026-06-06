@@ -63,7 +63,14 @@ export function createOpenAICompatibleInterpreter({ apiKey, baseUrl, model, brie
   const briefM = briefModel || model;
   const fallbackM = fallbackModel || model;
 
-  async function chat(system, user, temperature, useModel) {
+  async function chat(system, user, temperature, useModel, image) {
+    // With an image, the user turn becomes a multimodal content array (vision).
+    const userContent = image
+      ? [
+          { type: "text", text: user },
+          { type: "image_url", image_url: { url: image } },
+        ]
+      : user;
     let data;
     try {
       data = await http(url, {
@@ -77,7 +84,7 @@ export function createOpenAICompatibleInterpreter({ apiKey, baseUrl, model, brie
           ...extraBody,
           messages: [
             { role: "system", content: system },
-            { role: "user", content: user },
+            { role: "user", content: userContent },
           ],
         }),
       });
@@ -93,25 +100,30 @@ export function createOpenAICompatibleInterpreter({ apiKey, baseUrl, model, brie
 
   return {
     async interpret(context) {
+      const image = context.image || null;
+
       // Stage 1 — understand the text on the cheap model. Best-effort.
+      // Skipped for photo-only requests (the vision curate reads the image).
       let brief = null;
-      try {
-        brief = await chat(BRIEF_PROMPT, context.mood, 0.4, briefM);
-      } catch {
-        brief = null;
+      if (!image && context.mood) {
+        try {
+          brief = await chat(BRIEF_PROMPT, context.mood, 0.4, briefM);
+        } catch {
+          brief = null;
+        }
       }
 
-      // Stage 2 — curate; fall back to the lighter model on rate-limit.
+      // Stage 2 — curate (vision when an image is present); fall back on rate-limit.
       const userMsg = buildUserMessage({ ...context, brief });
       let raw;
       try {
-        raw = await chat(SYSTEM_PROMPT, userMsg, 1.0, model);
+        raw = await chat(SYSTEM_PROMPT, userMsg, 1.0, model, image);
       } catch (e) {
         const status = e?.cause?.status;
         // Rate-limited (429) or transiently overloaded (5xx) → try the lighter model.
         const retryable = status === 429 || (status >= 500 && status < 600);
         if (retryable && model !== fallbackM) {
-          raw = await chat(SYSTEM_PROMPT, userMsg, 1.0, fallbackM);
+          raw = await chat(SYSTEM_PROMPT, userMsg, 1.0, fallbackM, image);
         } else if (status === 429) {
           throw new InterpreterError("Daily token/rate limit reached", {
             safeMessage: "The free AI quota is maxed out for now — try again shortly.",

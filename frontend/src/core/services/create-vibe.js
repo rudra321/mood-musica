@@ -32,21 +32,28 @@ function seededShuffle(arr, seed) {
  *   resolver: import("../ports/track-resolver.js").TrackResolver,
  *   geocoder: import("../ports/geocoder.js").Geocoder,
  *   chartProvider: import("../ports/chart-provider.js").ChartProvider,
+ *   weatherProvider: import("../ports/weather-provider.js").WeatherProvider,
  * }} deps
  */
-export function createVibe({ interpreter, resolver, geocoder, chartProvider }) {
-  return async function createVibeForMood({ mood, lat, lng, eraFrom, eraTo, familiarity, exclude, seed }) {
+export function createVibe({ interpreter, resolver, geocoder, chartProvider, weatherProvider }) {
+  return async function createVibeForMood({ mood, image, lat, lng, eraFrom, eraTo, familiarity, exclude, seed }) {
     const place =
       typeof lat === "number" && typeof lng === "number"
         ? await geocoder.reverseGeocode({ lat, lng })
         : null;
 
-    const chart = place ? await chartProvider.topSongs(place.countryCode) : [];
+    // Local charts + current conditions, fetched together (best-effort).
+    const [chart, weather] = await Promise.all([
+      place ? chartProvider.topSongs(place.countryCode) : [],
+      place && typeof lat === "number" ? weatherProvider.current({ lat, lng }) : null,
+    ]);
 
     const vibe = await interpreter.interpret({
       mood,
+      image,
       place,
       chart,
+      weather,
       era: { from: eraFrom ?? null, to: eraTo ?? null },
       familiarity,
       exclude,
@@ -76,6 +83,6 @@ export function createVibe({ interpreter, resolver, geocoder, chartProvider }) {
     };
     const textColor = contrastTextColor(palette.gradientFrom);
 
-    return ResolvedVibe.parse({ ...vibe, palette, tracks, textColor, place });
+    return ResolvedVibe.parse({ ...vibe, palette, tracks, textColor, place, weather });
   };
 }

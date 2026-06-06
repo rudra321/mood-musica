@@ -20,6 +20,9 @@ export const PLACE_RULE =
 export const CHART_HINT_RULE =
   'Any "popular there right now" list is only a faint regional hint: include an entry ONLY if it genuinely fits the mood, and ignore everything else. NEVER let local popularity override the mood. That list is often full of GLOBAL English-language pop — use it only to spot genuinely LOCAL artists, and ignore its English/international entries.';
 
+export const IMAGE_RULE =
+  "If the user shares a PHOTO, read it: derive the palette from its dominant colors and the mood/energy from what it depicts (setting, light, subject). Treat any typed mood as extra guidance. The palette should genuinely echo the image.";
+
 export const LOCAL_LANGUAGE =
   "When a place is given, sing in that place's local/regional language(s) by DEFAULT — e.g. India → Hindi/Punjabi/regional (Rajasthan → Rajasthani/Hindi), Brazil → Portuguese, Japan → Japanese, Korea → Korean. Do NOT include English-language international pop unless the user's mood explicitly asks for English, or names a specific non-local style/artist. A plain mood like \"happy\" or \"chill\" in India means happy/chill LOCAL-language music, not Western pop.";
 

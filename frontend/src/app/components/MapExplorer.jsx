@@ -12,8 +12,34 @@ import NowPlaying from "./NowPlaying";
 import Tuner, { ERA_MIN, ERA_MAX } from "./Tuner";
 import DetailModal from "./DetailModal";
 import VibesRail from "./VibesRail";
+import TripCard from "./TripCard";
+import Spinner from "./Spinner";
 import { trackId } from "./player-utils";
-import { Sparkles, Locate, Sliders, ArrowRight } from "./icons";
+import { Sparkles, Locate, Sliders, ArrowRight, Image as ImageIcon, Route } from "./icons";
+
+// Downscale a picked image client-side → small JPEG data URL for the vision call.
+function downscaleImage(file, max = 768) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 const MapCanvas = dynamic(() => import("./MapCanvas"), {
   ssr: false,
@@ -48,6 +74,12 @@ export default function MapExplorer() {
   const [familiarity, setFamiliarity] = useState("balanced");
   const [tunerOpen, setTunerOpen] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [tripMode, setTripMode] = useState(false);
+  const [stops, setStops] = useState([]);
+  const [trip, setTrip] = useState(null);
+  const [tripStatus, setTripStatus] = useState("idle"); // idle | loading | done | error
+
+  const photoInputRef = useRef(null);
 
   // --- global audio engine ---
   const audioRef = useRef(null);
@@ -115,10 +147,16 @@ export default function MapExplorer() {
     return [...new Set(ids)].slice(-60);
   }
 
-  async function fetchVibe(text, c) {
+  async function fetchVibe({ mood: text, coords: c, image }) {
     setStatus("loading");
     setError("");
-    const body = { mood: text, lat: c.lat, lng: c.lng, familiarity, seed: Math.floor(Math.random() * 1e9) };
+    const body = { familiarity, seed: Math.floor(Math.random() * 1e9) };
+    if (text) body.mood = text;
+    if (image) body.image = image;
+    if (c) {
+      body.lat = c.lat;
+      body.lng = c.lng;
+    }
     if (era.from != null && era.from > ERA_MIN) body.eraFrom = era.from;
     if (era.to != null && era.to < ERA_MAX) body.eraTo = era.to;
     const exclude = seenIds();
@@ -133,7 +171,10 @@ export default function MapExplorer() {
       if (!res.ok) throw new Error(data?.error?.message || "Something went wrong.");
       setVibe(data);
       setStatus("done");
-      setExplored((prev) => [...prev, { coords: c, vibe: data, accent: data?.palette?.colors?.[0], mood: text }]);
+      setExplored((prev) => [
+        ...prev,
+        { coords: c || null, vibe: data, accent: data?.palette?.colors?.[0], mood: text || "📷 photo" },
+      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
       setStatus("error");
@@ -141,20 +182,96 @@ export default function MapExplorer() {
   }
 
   function pick(c) {
+    if (tripMode) {
+      setStops((prev) => [...prev, c]);
+      setCoords(c); // flyTo the new stop
+      return;
+    }
     setCoords(c);
     const text = mood.trim();
     if (!text) {
       flashHint("Type a mood first, then tap a place ↑");
       return;
     }
-    fetchVibe(text, c);
+    fetchVibe({ mood: text, coords: c });
+  }
+
+  function toggleTrip() {
+    setTripMode((on) => {
+      const next = !on;
+      if (next) {
+        setStops([]);
+        setTrip(null);
+        setTripStatus("idle");
+        setStatus("idle");
+      }
+      return next;
+    });
+  }
+
+  // One vibe for a stop, returned (not stored) — used to build the trip.
+  async function vibeForStop(c) {
+    const body = { mood: mood.trim(), lat: c.lat, lng: c.lng, familiarity, seed: Math.floor(Math.random() * 1e9) };
+    if (era.from != null && era.from > ERA_MIN) body.eraFrom = era.from;
+    if (era.to != null && era.to < ERA_MAX) body.eraTo = era.to;
+    const res = await fetch("/api/vibe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || "Something went wrong.");
+    return data;
+  }
+
+  async function buildTrip() {
+    if (!mood.trim()) {
+      flashHint("Type a mood for the trip ↑");
+      return;
+    }
+    if (stops.length < 2) {
+      flashHint("Tap at least 2 stops on the map");
+      return;
+    }
+    setTripStatus("loading");
+    setTrip(null);
+    // Resilient: one bad stop (ocean, geocode/quota hiccup) shouldn't sink the trip.
+    const settled = await Promise.allSettled(stops.map(vibeForStop));
+    const vibes = settled.filter((s) => s.status === "fulfilled").map((s) => s.value);
+    if (vibes.length < 2) {
+      setError("Couldn't reach enough of those places — try different stops.");
+      setTripStatus("error");
+      return;
+    }
+    setTrip(vibes.map((v) => ({ vibe: v })));
+    setTripStatus("done");
   }
 
   function onMoodSubmit() {
+    if (loading) return;
+    if (tripMode) {
+      buildTrip();
+      return;
+    }
     const text = mood.trim();
     if (!text) return;
-    if (coords) fetchVibe(text, coords);
+    if (coords) fetchVibe({ mood: text, coords });
     else flashHint("Now tap a place on the map →");
+  }
+
+  async function onPhoto(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setTripMode(false);
+    setStatus("loading"); // show the spinner immediately while we read/resize
+    try {
+      const image = await downscaleImage(file);
+      fetchVibe({ mood: mood.trim(), coords, image });
+    } catch {
+      setStatus("idle");
+      flashHint("Couldn't read that image");
+    }
   }
 
   function replayExplored(e) {
@@ -175,18 +292,21 @@ export default function MapExplorer() {
   }
 
   function surprise() {
+    setTripMode(false);
     const c = rand(CITIES);
     const m = rand(MOODS);
     setMood(m);
     setCoords(c);
-    fetchVibe(m, c);
+    fetchVibe({ mood: m, coords: c });
   }
 
   const accent = vibe?.palette?.colors?.[0];
-  const panelOpen = status === "loading" || status === "done" || status === "error";
+  const loading = status === "loading" || tripStatus === "loading";
+  const singleOpen = !tripMode && (status === "loading" || status === "done" || status === "error");
+  const panelOpen = singleOpen || tripMode;
 
   const iconBtn =
-    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-black/10 text-black/55 transition-colors hover:border-black/30 hover:text-black";
+    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-black/10 text-black/55 transition-colors hover:border-black/30 hover:text-black disabled:opacity-40 disabled:hover:border-black/10 disabled:hover:text-black/55";
 
   return (
     <div className="fixed inset-0 overflow-hidden text-[#1c1b19]">
@@ -197,6 +317,7 @@ export default function MapExplorer() {
           accent={accent}
           explored={explored}
           onSelectExplored={replayExplored}
+          stops={tripMode ? stops : []}
         />
       </div>
 
@@ -218,10 +339,35 @@ export default function MapExplorer() {
             aria-label="Describe your mood"
             className="flex-1 bg-transparent px-3 py-2 text-[#1c1b19] placeholder:text-black/35 focus:outline-none"
           />
-          <button type="button" onClick={surprise} aria-label="Surprise me" className={iconBtn}>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            onChange={onPhoto}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            aria-label="Photo to soundtrack"
+            disabled={loading}
+            className={iconBtn}
+          >
+            <ImageIcon className="h-5 w-5" />
+          </button>
+          <button type="button" onClick={surprise} aria-label="Surprise me" disabled={loading} className={iconBtn}>
             <Sparkles className="h-5 w-5" />
           </button>
-          <button type="button" onClick={locateMe} aria-label="Use my location" className={iconBtn}>
+          <button
+            type="button"
+            onClick={toggleTrip}
+            aria-label="Road trip mode"
+            aria-pressed={tripMode}
+            className={`${iconBtn} ${tripMode ? "border-black/40 text-black" : ""}`}
+          >
+            <Route className="h-5 w-5" />
+          </button>
+          <button type="button" onClick={locateMe} aria-label="Use my location" disabled={loading} className={iconBtn}>
             <Locate className="h-5 w-5" />
           </button>
           <button
@@ -235,10 +381,15 @@ export default function MapExplorer() {
           </button>
           <button
             type="submit"
-            aria-label="Reveal"
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white transition-transform hover:scale-105"
+            aria-label={tripMode ? "Build trip" : "Reveal"}
+            disabled={loading}
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white transition-transform hover:scale-105 disabled:hover:scale-100"
           >
-            <ArrowRight className="h-5 w-5" />
+            {loading ? (
+              <Spinner className="h-[18px] w-[18px] border-white/40 border-t-white" />
+            ) : (
+              <ArrowRight className="h-5 w-5" />
+            )}
           </button>
         </form>
 
@@ -275,42 +426,98 @@ export default function MapExplorer() {
             transition={{ type: "spring", stiffness: 280, damping: 30 }}
             className="glass absolute inset-x-0 bottom-0 z-30 h-[74vh] overflow-y-auto rounded-t-3xl p-5 pb-28 shadow-2xl shadow-black/20 md:inset-y-0 md:right-auto md:left-0 md:h-full md:w-[440px] md:rounded-r-3xl md:rounded-tl-none md:pb-28"
           >
-            <div className="mb-4 flex items-center justify-between">
-              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-black/45">
-                {vibe?.place ? vibe.place.label : "your vibe"}
-              </span>
-              <button
-                type="button"
-                onClick={() => setStatus("idle")}
-                aria-label="Close"
-                className="text-black/45 transition-colors hover:text-black"
-              >
-                ✕
-              </button>
-            </div>
+            {tripMode ? (
+              <>
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-black/45">
+                    road trip · {stops.length} stop{stops.length === 1 ? "" : "s"}
+                  </span>
+                  <button type="button" onClick={toggleTrip} aria-label="Exit trip mode" className="text-black/45 transition-colors hover:text-black">
+                    ✕
+                  </button>
+                </div>
 
-            {status === "loading" && (
-              <div className="flex h-[60%] flex-col items-center justify-center gap-3 text-center">
-                <span className="h-8 w-8 animate-spin rounded-full border-2 border-black/15 border-t-black/70" />
-                <AnimatePresence mode="wait">
-                  <motion.p
-                    key={lineIdx}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="font-mono text-sm text-black/50"
+                {tripStatus === "loading" ? (
+                  <div className="flex h-[60%] flex-col items-center justify-center gap-3 text-center">
+                    <Spinner className="h-8 w-8 border-black/15 border-t-black/70" />
+                    <p className="font-mono text-sm text-black/50">Charting the journey…</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3">
+                      {!trip && (
+                        <p className="font-mono text-sm leading-relaxed text-black/55">
+                          Tap stops on the map (2+), set a mood, then build one journey through their sounds.
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={buildTrip}
+                          disabled={stops.length < 2}
+                          className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+                        >
+                          {trip ? "Rebuild" : "Build trip"}
+                        </button>
+                        {stops.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStops([]);
+                              setTrip(null);
+                            }}
+                            className="rounded-xl border border-black/10 px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-black/55 hover:text-black"
+                          >
+                            clear
+                          </button>
+                        )}
+                      </div>
+                      {tripStatus === "error" && <p className="font-mono text-sm text-red-600">{error}</p>}
+                    </div>
+                    {trip && <TripCard trip={trip} player={player} onOpenDetail={setDetail} />}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-black/45">
+                    {vibe?.place ? vibe.place.label : "your vibe"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setStatus("idle")}
+                    aria-label="Close"
+                    className="text-black/45 transition-colors hover:text-black"
                   >
-                    {LOADING_LINES[lineIdx]}
-                  </motion.p>
-                </AnimatePresence>
-              </div>
-            )}
+                    ✕
+                  </button>
+                </div>
 
-            {status === "error" && (
-              <p className="mt-8 text-center font-mono text-sm text-red-600">{error}</p>
-            )}
+                {status === "loading" && (
+                  <div className="flex h-[60%] flex-col items-center justify-center gap-3 text-center">
+                    <Spinner className="h-8 w-8 border-black/15 border-t-black/70" />
+                    <AnimatePresence mode="wait">
+                      <motion.p
+                        key={lineIdx}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="font-mono text-sm text-black/50"
+                      >
+                        {LOADING_LINES[lineIdx]}
+                      </motion.p>
+                    </AnimatePresence>
+                  </div>
+                )}
 
-            {status === "done" && vibe && <VibeCard vibe={vibe} player={player} onOpenDetail={setDetail} />}
+                {status === "error" && (
+                  <p className="mt-8 text-center font-mono text-sm text-red-600">{error}</p>
+                )}
+
+                {status === "done" && vibe && <VibeCard vibe={vibe} player={player} onOpenDetail={setDetail} />}
+              </>
+            )}
           </motion.aside>
         )}
       </AnimatePresence>

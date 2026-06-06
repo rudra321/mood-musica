@@ -17,6 +17,7 @@ import {
   MapContainer,
   TileLayer,
   Marker,
+  Polyline,
   ZoomControl,
   useMap,
   useMapEvents,
@@ -64,12 +65,22 @@ function bloomIcon(color) {
   });
 }
 
+function tripIcon(n) {
+  return L.divIcon({
+    className: "",
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+    html: `<span class="trip-pin">${n}</span>`,
+  });
+}
+
 export default function MapCanvas({
   selected,
   onPick,
   accent,
   explored = [],
   onSelectExplored,
+  stops = [],
 }) {
   return (
     <MapContainer
@@ -90,7 +101,7 @@ export default function MapCanvas({
       <Clicker onPick={onPick} />
       <FlyTo target={selected} />
 
-      {explored.map((e, i) => (
+      {explored.filter((e) => e.coords).map((e, i) => (
         <Marker
           key={`${e.coords.lat},${e.coords.lng},${i}`}
           position={[e.coords.lat, e.coords.lng]}
@@ -99,7 +110,17 @@ export default function MapCanvas({
         />
       ))}
 
-      {selected && (
+      {stops.length > 1 && (
+        <Polyline
+          positions={stops.map((s) => [s.lat, s.lng])}
+          pathOptions={{ color: "#1c1b19", weight: 2, opacity: 0.5, dashArray: "3 7" }}
+        />
+      )}
+      {stops.map((s, i) => (
+        <Marker key={`stop-${i}`} position={[s.lat, s.lng]} icon={tripIcon(i + 1)} />
+      ))}
+
+      {selected && stops.length === 0 && (
         <Marker position={[selected.lat, selected.lng]} icon={activeIcon(accent)} />
       )}
     </MapContainer>
