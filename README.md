@@ -1,7 +1,6 @@
 # MoodMusica
 
-**Describe a feeling, tap a place on the map, and get an AI-curated color palette
-+ a region-appropriate, playable soundtrack.**
+**Describe a feeling, tap a place on the map, and get an AI-curated color palette + a region-appropriate, playable soundtrack.**
 
 A map-first music-discovery web app. The whole screen is an interactive world map;
 type a mood, drop a pin anywhere, and the screen blooms into that place's sound —
